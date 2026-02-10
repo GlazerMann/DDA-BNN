@@ -1,0 +1,31 @@
+# ───────── configs/grid_search.yaml ─────────
+#   All keys here override / extend your default YAML.
+#   A list means: "try every value in the list".
+
+# --- keep diagonal covariance head (single option) -------------------
+UNCERTAINTY_MODE: [diag]
+
+# --- exactly ONE Bayesian layer, tried at two positions --------------
+LAYER_SPEC:
+  # (0) BNN layer **in the middle**
+  - - {units: 128, type: det, act: ReLU}
+    - {units: 128, type: det, act: ReLU}
+    - {units: 128, type: bnn, act: ReLU}   # ← Bayesian layer
+    - {units: 64, type: det, act: ReLU}
+    - {units: 32, type: det, act: ReLU}
+
+
+# --- Bayesian–specific hyper-parameters to sweep ---------------------
+PRIOR_STD:         [1]
+WARMUP:            [100]            # KL warm-up epochs
+DET_WARMUP:        [50]
+
+LR_SCALE_FACTOR:   [0.1]        # scales LR inside SVI
+BAYES_NUM_SAMPLES: [50]
+
+# --- global optimiser settings to tune --------------------
+LR:                [3.0e-5]
+BATCH_SIZE:        [32]
+
+LOG_VAR_MIN:      [-10]
+LOG_VAR_MAX:      [-3]

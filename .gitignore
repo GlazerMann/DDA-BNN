@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────
+#  Data
+# ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+#  Secrets / local configuration
+# ─────────────────────────────────────────────
+.env
+*.env
+!*.env.example      # keep a template if you have one
+
+# ─────────────────────────────────────────────
+#  Python cache & build artefacts (may appear on host)
+# ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+*.egg-info/
+*.log
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ipynb_checkpoints/
+
+# ─────────────────────────────────────────────
+#  Editor / IDE settings
+# ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ─────────────────────────────────────────────
+#  OS-specific cruft
+# ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+artifacts/
+training/artifacts/
+/training/BNN_SWEEP/
+/training/
+/archive/
+/artifacts/
+/data/
