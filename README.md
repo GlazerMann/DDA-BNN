@@ -1,4 +1,4 @@
-# MIE aerosol property correction via Neural Networks with Uncertainty Quantification
+# Fast surrogate of the Discrete Dipole Approximation via Neural Networks with Uncertainty Quantification
 
 This branch is a stand alone Jupyter notebook implementation for model training and evaluation.
 
