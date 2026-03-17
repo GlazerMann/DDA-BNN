@@ -1,4 +1,6 @@
-# Fast surrogate of the Discrete Dipole Approximation via Neural Networks with Uncertainty Quantification
+# DDA-BNN: A Morphology-Aware Bayesian Neural Network Surrogate for Black Carbon Optical Properties
+
+DDA-BNN is a surrogate modeling framework for predicting the optical properties of black carbon–containing particles from particle morphology, coating state, and composition. Trained on discrete dipole approximation (DDA) simulations, it predicts extinction efficiency, single-scattering albedo, and asymmetry parameter while also quantifying aleatoric and epistemic uncertainty.
 
 This branch is a stand alone Jupyter notebook implementation for model training and evaluation.
 
