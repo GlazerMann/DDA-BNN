@@ -1,0 +1,62 @@
+# ---------------- Data ----------------
+ROOT_DIR: ".."          # project root (relative to training/)
+DATA_FILE: "data/DDA_dataset_extended_JAN.csv"
+
+FEATURES:
+  - Npp
+  - V/V0
+  - coating_RI_imag
+  - Xve
+  - core_Df
+
+TARGETS: [Qext, SSA, g]
+
+TRAIN_FRACTION: 0.80    # 80 % train
+VAL_FRACTION:   0.10    # 10 % validation
+USE_ZSCORE_SCALING: true
+
+TARGET_TF:
+  Qext: log             # strictly positive
+  SSA:  logit           # bounded (0,1)
+  g:    logit
+
+TF_EPS: 1.0e-6
+
+# --------------- Data imbalance ---------------
+BALANCE_TARGETS:  []
+N_BINS:           16
+BALANCE_STRATEGY: prod
+
+# --------------- Network architecture ----------
+LAYER_SPEC:
+  - {units: 64, type: det, act: ReLU}
+  - {units: 64, type: det, act: ReLU}
+  - {units: 64, type: bnn, act: ReLU}
+  - {units: 64, type: det, act: ReLU}
+  - {units: 64, type: det, act: ReLU}
+
+# --------------- Output / uncertainty ----------
+UNCERTAINTY_MODE: diag
+LOG_VAR_MIN:      -10
+LOG_VAR_MAX:      -3
+RHO_MAX:          0.4
+
+# --------------- Bayesian controls -------------
+PRIOR_STD:         1
+BAYES_NUM_SAMPLES: 50
+WARMUP:            0
+DET_WARMUP:        0
+LR_SCALE_FACTOR:   1
+
+# --------------- Optimiser / training ----------
+LR:                     0.0003
+BATCH_SIZE:             32
+EPOCHS:                 1000
+GRAD_CLIP_NORM:         5
+EARLY_STOP_PATIENCE:    1000
+EARLY_STOP_MIN_DELTA:   1.0e-3
+
+# --------------- Runtime / misc ----------------
+ARTIFACT_DIR: "artifacts"
+DEVICE:       auto      # "auto" → cuda if available, else cpu
+SEED:         500

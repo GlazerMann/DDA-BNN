@@ -1,0 +1,27 @@
+name: bnn_notebook_env
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  # core
+  - python=3.11
+  - numpy>=1.22
+  - pandas
+  - scikit-learn=1.5.*
+  - matplotlib-base
+  - scipy
+  - pyyaml
+  - pillow
+  - tqdm
+
+  # PyTorch / Pyro
+  - pytorch::cpuonly
+  - pytorch::pytorch=2.4.*
+  - pyro-ppl>=1.9
+
+  # Jupyter
+  - jupyterlab
+  - notebook
+  - ipykernel
+
+  - pip

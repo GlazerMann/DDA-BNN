@@ -1,0 +1,58 @@
+ARTIFACT_DIR: C:\Git\aerosol_bnn\artifacts\20260329_134948
+BALANCE_STRATEGY: prod
+BALANCE_TARGETS: []
+BATCH_SIZE: 32
+BAYES_NUM_SAMPLES: 50
+DATA_FILE: C:\Git\aerosol_bnn\data\DDA_dataset.csv
+DET_WARMUP: 50
+DEVICE: cpu
+EARLY_STOP_MIN_DELTA: 0.001
+EARLY_STOP_PATIENCE: 1000
+EPOCHS: 5
+FEATURES:
+- Npp
+- V/V0
+- coating_RI_imag
+- Xve
+- core_Df
+GRAD_CLIP_NORM: 5
+LAYER_SPEC:
+- units: 128
+  type: det
+  act: ReLU
+- units: 128
+  type: det
+  act: ReLU
+- units: 128
+  type: bnn
+  act: ReLU
+- units: 64
+  type: det
+  act: ReLU
+- units: 32
+  type: det
+  act: ReLU
+LOG_VAR_MAX: -3
+LOG_VAR_MIN: -10
+LR: 3.0e-05
+LR_SCALE_FACTOR: 0.1
+N_BINS: 16
+PRIOR_STD: 1
+RHO_MAX: 0.4
+ROOT_DIR: C:\Git\aerosol_bnn
+SEED: 500
+TARGETS:
+- Qext
+- SSA
+- g
+TARGET_TF:
+  Qext: log
+  SSA: logit
+  g: logit
+TF_EPS: 1.0e-06
+TRAIN_FRACTION: 0.8
+UNCERTAINTY_MODE: diag
+USE_ZSCORE_SCALING: true
+VAL_FRACTION: 0.1
+WARMUP: 100
+_DEFAULT_FILE: C:\Git\aerosol_bnn\training\configs\default.yaml

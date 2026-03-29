@@ -1,0 +1,2 @@
+run,val,UNCERTAINTY_MODE,LAYER_SPEC,PRIOR_STD,WARMUP,DET_WARMUP,LR_SCALE_FACTOR,BAYES_NUM_SAMPLES,LR,BATCH_SIZE,LOG_VAR_MIN,LOG_VAR_MAX
+20260329_134949,10270.052152593084,diag,"[{'units': 128, 'type': 'det', 'act': 'ReLU'}, {'units': 128, 'type': 'det', 'act': 'ReLU'}, {'units': 128, 'type': 'bnn', 'act': 'ReLU'}, {'units': 64, 'type': 'det', 'act': 'ReLU'}, {'units': 32, 'type': 'det', 'act': 'ReLU'}]",1,100,50,0.1,50,3e-05,32,-10,-3

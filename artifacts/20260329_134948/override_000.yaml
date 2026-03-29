@@ -1,0 +1,57 @@
+ROOT_DIR: ..
+DATA_FILE: data/DDA_dataset.csv
+FEATURES:
+- Npp
+- V/V0
+- coating_RI_imag
+- Xve
+- core_Df
+TARGETS:
+- Qext
+- SSA
+- g
+TRAIN_FRACTION: 0.8
+VAL_FRACTION: 0.1
+USE_ZSCORE_SCALING: true
+TARGET_TF:
+  Qext: log
+  SSA: logit
+  g: logit
+TF_EPS: 1.0e-06
+BALANCE_TARGETS: []
+N_BINS: 16
+BALANCE_STRATEGY: prod
+LAYER_SPEC:
+- units: 128
+  type: det
+  act: ReLU
+- units: 128
+  type: det
+  act: ReLU
+- units: 128
+  type: bnn
+  act: ReLU
+- units: 64
+  type: det
+  act: ReLU
+- units: 32
+  type: det
+  act: ReLU
+UNCERTAINTY_MODE: diag
+LOG_VAR_MIN: -10
+LOG_VAR_MAX: -3
+RHO_MAX: 0.4
+PRIOR_STD: 1
+BAYES_NUM_SAMPLES: 50
+WARMUP: 100
+DET_WARMUP: 50
+LR_SCALE_FACTOR: 0.1
+LR: 3.0e-05
+BATCH_SIZE: 32
+EPOCHS: 5
+GRAD_CLIP_NORM: 5
+EARLY_STOP_PATIENCE: 1000
+EARLY_STOP_MIN_DELTA: 0.001
+ARTIFACT_DIR: C:\Git\aerosol_bnn\artifacts\20260329_134948
+DEVICE: auto
+SEED: 500
