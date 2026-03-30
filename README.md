@@ -47,3 +47,5 @@ conda env create -f environment.yml
 conda activate bnn_notebook_env
 ```
 
+## Reference
+Archived release: https://doi.org/10.5281/zenodo.19324375
