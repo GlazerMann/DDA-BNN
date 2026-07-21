@@ -5,10 +5,18 @@ version: "1.0.2"
 type: software
 license: BSD-2-Clause
 repository-code: "https://github.com/pnnl/DDA-BNN"
+url: "https://doi.org/10.5281/zenodo.21478183"
+
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21478183"
+    description: "Versioned DOI for DDA-BNN v1.0.2."
+
 abstract: >-
   DDA-BNN is a morphology-aware Bayesian neural network surrogate for
   predicting the optical properties of black carbon-containing particles
   and quantifying aleatoric and epistemic uncertainty.
+
 authors:
   - family-names: Beeler
     given-names: Payton
