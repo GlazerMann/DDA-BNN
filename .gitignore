@@ -38,9 +38,13 @@ build/
 .DS_Store
 Thumbs.db
 
+# ─────────────────────────────────────────────
+#  Local artifacts (may appear on host)
+# ─────────────────────────────────────────────
 artifacts/*
 !artifacts/README.md
 !artifacts/20260329_134948/
 !artifacts/20260329_134948/**
 training/artifacts/
 /training/BNN_SWEEP/
+data/ADDA_run_example/*.txt
