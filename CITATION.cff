@@ -1,11 +1,21 @@
-cff-version: 1.0.1
-title: "DDA-BNN v1.0"
+cff-version: 1.2.0
+message: "Please cite this software using these metadata."
+title: "DDA-BNN v1.0: A Morphology-Aware Surrogate Model for the Optical Properties of Black Carbon–Containing Particles"
 version: 1.0.2
+type: software
+license: BSD-2-Clause
+repository-code: "https://github.com/pnnl/DDA-BNN"
+abstract: >-
+  DDA-BNN is a morphology-aware Bayesian neural network surrogate for
+  predicting the optical properties of black carbon-containing particles
+  and quantifying aleatoric and epistemic uncertainty.
 authors:
   - family-names: Beeler
     given-names: Payton
+    affiliation: Pacific Northwest National Laboratory
   - family-names: Donald
     given-names: Sam
+    affiliation: Pacific Northwest National Laboratory
   - family-names: Fierce
     given-names: Laura
-  
+    affiliation: Pacific Northwest National Laboratory
