@@ -1,6 +1,6 @@
 ## Quick start
 
-This folder shows an example ADDA run that can be used to run new ADDA simulations. It includes an example cluster xyz file, discretization and coating alogorithm, and ADDA command line. An example ADDA can be run following:
+This folder shows an example ADDA run that can be used to run new ADDA simulations. It includes an example cluster xyz file, discretization and coating algorithm, and ADDA command line. An example ADDA simulation can be run as follows:
 
 1. Download the adda source code from https://github.com/adda-team/adda.git
 2. Compile the MPI version of ADDA
