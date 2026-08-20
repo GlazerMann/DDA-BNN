@@ -34,7 +34,7 @@ def _apply(d: dict[str, Any]) -> None:
 
 def _post() -> None:
     """Resolve paths and device after every load/override."""
-    root = Path(globals()["ROOT_DIR"]).resolve()
+    root = (Path(__file__).resolve().parent / ROOT_DIR).resolve()
     globals()["ROOT_DIR"] = root
     ns.ROOT_DIR = root
 
