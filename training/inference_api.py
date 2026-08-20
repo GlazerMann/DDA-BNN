@@ -295,8 +295,14 @@ def run_inference_phys(
     tf_info = meta["tf_info"]
     tf_eps = cfg.TF_EPS
 
+    # NOTE: taus=None here is deliberate. run_inference_latent() defaults to
+    # "auto" (auto-loading taus.json) when called on its own, but this function
+    # applies its own calibration below using samples straight from the
+    # posterior. Letting run_inference_latent also calibrate here would apply
+    # the tau factor twice (approximately squaring it).
     mu_lat_mean, std_ale_lat, std_epi_lat, mu_lat_s, std_ale_lat_s = run_inference_latent(
-        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed, return_samples=True
+        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed,
+        return_samples=True, taus=None,
     )
     if mu_lat_s is None:
         raise RuntimeError("return_samples=True failed to produce mu_lat_s")
