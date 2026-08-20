@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Union, Optional, Dict, Tuple
+import json
 import numpy as np
 import yaml
 import torch
@@ -112,6 +113,30 @@ def _taus_to_array(
     return arr
 
 
+def _load_taus_from_run_dir(run_dir: Path) -> Optional[Dict[str, float]]:
+    """Load taus.json from a run directory if it exists, else return None."""
+    taus_path = run_dir / "taus.json"
+    if taus_path.exists():
+        with taus_path.open("r") as fh:
+            return json.load(fh)
+    return None
+
+
+def _resolve_taus(
+    taus: Union[None, str, Dict[str, float], np.ndarray, torch.Tensor],
+    run_dir: Path,
+    dtype,
+) -> Optional[torch.Tensor]:
+    """Resolve the taus argument:
+    - "auto" (default) -> load from run_dir/taus.json, or None if missing
+    - None             -> no calibration scaling
+    - dict / array / tensor -> use directly
+    """
+    if isinstance(taus, str) and taus.lower() == "auto":
+        taus = _load_taus_from_run_dir(run_dir)
+    return _taus_to_array(taus, dtype)
+
+
 @torch.no_grad()
 def run_inference_latent(
     model_dir: Union[str, Path],
@@ -120,7 +145,7 @@ def run_inference_latent(
     num_mc: Optional[int] = None,
     seed: int = 0,
     return_samples: bool = False,
-    taus: Union[None, Dict[str, float], np.ndarray, torch.Tensor] = None,
+    taus: Union[None, str, Dict[str, float], np.ndarray, torch.Tensor] = "auto",
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
     """
     Run inference in latent space.
@@ -134,7 +159,10 @@ def run_inference_latent(
         mu_lat_s: (S, N, D) posterior samples
         std_ale_lat_s: (S, N, D) aleatoric std per sample or None
 
-    If taus is provided, applies temperature scaling in latent space.
+    taus:
+        - "auto" (default) -> load run_dir/taus.json if present, else no scaling
+        - None             -> no calibration scaling
+        - dict / array / tensor -> use directly
     """
     run_dir = resolve_run_dir(model_dir)
     cfg_path = run_dir / "config_used.yaml"
@@ -192,7 +220,7 @@ def run_inference_latent(
     else:
         mu_lat_s, std_lat_s = mu_norm, std_norm
 
-    taus_arr = _taus_to_array(taus, dtype=mu_lat_s.dtype)
+    taus_arr = _resolve_taus(taus, run_dir, dtype=mu_lat_s.dtype)
     if taus_arr is not None:
         taus_arr = taus_arr.to(device)
         mu_bar = mu_lat_s.mean(dim=0, keepdim=True)
@@ -247,7 +275,7 @@ def run_inference_phys(
     device: Optional[torch.device] = None,
     num_mc: Optional[int] = None,
     seed: int = 0,
-    taus: Union[None, Dict[str, float], np.ndarray, torch.Tensor] = None,
+    taus: Union[None, str, Dict[str, float], np.ndarray, torch.Tensor] = "auto",
     L: int = 50,
     quantiles=(0.05, 0.5, 0.95),
 ):
@@ -257,7 +285,11 @@ def run_inference_phys(
     Outer loop (K) = posterior/epistemic samples
     Inner loop (L) = aleatoric noise samples
 
-    If taus provided, applies temperature scaling to both epistemic and aleatoric.
+    taus:
+        - "auto" (default) -> load run_dir/taus.json if present, else no scaling
+        - None             -> no calibration scaling
+        - dict / array / tensor -> use directly
+    Applies temperature scaling to both epistemic and aleatoric spread.
 
     Returns:
         mean_phys, std_ale_phys, std_epi_phys, std_tot_phys, quantile_dict
@@ -268,8 +300,14 @@ def run_inference_phys(
     tf_info = meta["tf_info"]
     tf_eps = cfg.TF_EPS
 
+    # NOTE: taus=None here is deliberate. run_inference_latent() defaults to
+    # "auto" (auto-loading taus.json) when called on its own, but this function
+    # applies its own calibration below (lines further down) using samples
+    # straight from the posterior. Letting run_inference_latent also calibrate
+    # here would apply the tau factor twice (approximately squaring it).
     mu_lat_mean, std_ale_lat, std_epi_lat, mu_lat_s, std_ale_lat_s = run_inference_latent(
-        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed, return_samples=True
+        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed,
+        return_samples=True, taus=None,
     )
     if mu_lat_s is None:
         raise RuntimeError("return_samples=True failed to produce mu_lat_s")
@@ -282,7 +320,7 @@ def run_inference_phys(
 
     S_eff, N, D = mu_lat_s_np.shape
 
-    taus_arr = _taus_to_array(taus, dtype=torch.float32)
+    taus_arr = _resolve_taus(taus, run_dir, dtype=torch.float32)
     if taus_arr is None:
         tau_np = np.ones((D,), dtype=np.float32)
     else:
