@@ -301,8 +301,7 @@ def run_inference_phys(
     # posterior. Letting run_inference_latent also calibrate here would apply
     # the tau factor twice (approximately squaring it).
     mu_lat_mean, std_ale_lat, std_epi_lat, mu_lat_s, std_ale_lat_s = run_inference_latent(
-        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed,
-        return_samples=True, taus=None,
+        run_dir, x_raw, device=device, num_mc=num_mc, seed=seed, return_samples=True, taus=None,
     )
     if mu_lat_s is None:
         raise RuntimeError("return_samples=True failed to produce mu_lat_s")
