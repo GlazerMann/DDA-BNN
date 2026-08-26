@@ -43,6 +43,24 @@ class RepositoryValidationTests(unittest.TestCase):
                 with path.open(encoding="utf-8") as stream:
                     self.assertIsInstance(yaml.safe_load(stream), dict)
 
+    def test_config_imports_are_cwd_independent(self) -> None:
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(PROJECT_ROOT)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for package in ("release", "training"):
+                code = f"from {package} import config as cfg; print(cfg.ROOT_DIR)"
+                result = subprocess.run(
+                    [sys.executable, "-c", code],
+                    cwd=temp_dir,
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                with self.subTest(package=package):
+                    self.assertEqual(Path(result.stdout.strip()).resolve(), PROJECT_ROOT)
+
     def test_release_notebook_is_valid(self) -> None:
         notebook_path = PROJECT_ROOT / "release" / "inference_notebook.ipynb"
         with notebook_path.open(encoding="utf-8") as stream:
