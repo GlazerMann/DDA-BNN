@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 import nbformat
 import numpy as np
 import yaml
 
-from release.inference_api import run_inference_phys
+from release.inference_api import run_inference_latent, run_inference_phys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +22,20 @@ MODEL_DIR = PROJECT_ROOT / "release" / "chosen_model"
 
 
 class RepositoryValidationTests(unittest.TestCase):
+   def test_expected_default_configs_exist(self) -> None:
+       for package in ("release", "training"):
+           path = PROJECT_ROOT / package / "configs" / "default.yaml"
+           with self.subTest(package=package):
+               self.assertTrue(path.is_file(), f"Missing expected config: {path}")
+
     def test_configuration_files_are_valid_yaml(self) -> None:
-        config_files = sorted(PROJECT_ROOT.glob("**/configs/*.[Yy][Aa][Mm][Ll]"))
+        config_files = sorted(
+           path
+           for path in PROJECT_ROOT.rglob("*")
+           if path.is_file()
+           and "configs" in path.parts
+           and path.suffix.lower() in {".yaml", ".yml"}
+        )
         self.assertGreater(len(config_files), 0)
 
         for path in config_files:
