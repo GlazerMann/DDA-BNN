@@ -173,10 +173,7 @@ def run_inference_latent(
         - dict / array / tensor -> use directly
     """
     run_dir = resolve_run_dir(model_dir)
-    cfg_path = run_dir / "config_used.yaml"
-    if cfg_path.exists():
-        with cfg_path.open("r") as f:
-            apply_config_used(cfg, yaml.safe_load(f))
+    _apply_run_config(run_dir)
 
     if device is None:
         device = torch.device(cfg.DEVICE) if isinstance(cfg.DEVICE, str) else cfg.DEVICE
@@ -303,6 +300,7 @@ def run_inference_phys(
         mean_phys, std_ale_phys, std_epi_phys, std_tot_phys, quantile_dict
     """
     run_dir = resolve_run_dir(model_dir)
+    _apply_run_config(run_dir)
 
     meta = torch.load(run_dir / "data_meta.pt", map_location="cpu", weights_only=False)
     tf_info = meta["tf_info"]
