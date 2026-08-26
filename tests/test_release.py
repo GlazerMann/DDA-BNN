@@ -23,18 +23,18 @@ MODEL_DIR = PROJECT_ROOT / "release" / "chosen_model"
 
 class RepositoryValidationTests(unittest.TestCase):
     def test_expected_default_configs_exist(self) -> None:
-       for package in ("release", "training"):
-           path = PROJECT_ROOT / package / "configs" / "default.yaml"
-           with self.subTest(package=package):
-               self.assertTrue(path.is_file(), f"Missing expected config: {path}")
+        for package in ("release", "training"):
+            path = PROJECT_ROOT / package / "configs" / "default.yaml"
+            with self.subTest(package=package):
+                self.assertTrue(path.is_file(), f"Missing expected config: {path}")
 
     def test_configuration_files_are_valid_yaml(self) -> None:
         config_files = sorted(
-           path
-           for path in PROJECT_ROOT.rglob("*")
-           if path.is_file()
-           and "configs" in path.parts
-           and path.suffix.lower() in {".yaml", ".yml"}
+            path
+            for path in PROJECT_ROOT.rglob("*")
+            if path.is_file()
+            and "configs" in path.parts
+            and path.suffix.lower() in {".yaml", ".yml"}
         )
         self.assertGreater(len(config_files), 0)
 
