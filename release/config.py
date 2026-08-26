@@ -39,9 +39,12 @@ def _post() -> None:
     globals()["ROOT_DIR"] = root
     ns.ROOT_DIR = root
 
-    globals()["DATA_FILE"] = ns.DATA_FILE = root / globals()["DATA_FILE"]
-    globals()["ARTIFACT_DIR"] = ns.ARTIFACT_DIR = root / globals()["ARTIFACT_DIR"]
-    ns.ARTIFACT_DIR.mkdir(exist_ok=True)
+   for key in ("DATA_FILE", "ARTIFACT_DIR"):
+       path = Path(globals()[key])
+       if not path.is_absolute():
+           path = root / path
+       globals()[key] = path
+       setattr(ns, key, path)
 
     globals()["DEVICE"] = ns.DEVICE = _device(globals()["DEVICE"])
 
