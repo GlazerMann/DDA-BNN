@@ -69,6 +69,21 @@ class RepositoryValidationTests(unittest.TestCase):
 
 
 class ReleaseInferenceTests(unittest.TestCase):
+    @staticmethod
+    def representative_input() -> np.ndarray:
+        # One representative row in the documented feature order:
+        # Npp, V/V0, coating_RI_imag, Xve, core_Df, Qext_HS, SSA_HS, g_HS.
+        return np.array(
+            [[28.0, 1.0, 0.0, np.pi * 0.121537 / 0.7, 1.76891,
+              0.816859706, 0.121279497, 0.066140142]],
+            dtype=np.float32,
+        )
+
+    @staticmethod
+    def load_taus() -> dict[str, float]:
+        with (MODEL_DIR / "taus.json").open(encoding="utf-8") as stream:
+            return json.load(stream)
+
     def test_bundled_model_runs_inference(self) -> None:
         required_artifacts = {
             "config_used.yaml",
@@ -79,22 +94,11 @@ class ReleaseInferenceTests(unittest.TestCase):
         }
         self.assertTrue(required_artifacts.issubset({path.name for path in MODEL_DIR.iterdir()}))
 
-        # One representative row in the documented feature order:
-        # Npp, V/V0, coating_RI_imag, Xve, core_Df, Qext_HS, SSA_HS, g_HS.
-        x_raw = np.array(
-            [[28.0, 1.0, 0.0, np.pi * 0.121537 / 0.7, 1.76891,
-              0.816859706, 0.121279497, 0.066140142]],
-            dtype=np.float32,
-        )
-        with (MODEL_DIR / "taus.json").open(encoding="utf-8") as stream:
-            taus = json.load(stream)
-
         mean, std_ale, std_epi, std_tot, quantiles = run_inference_phys(
             MODEL_DIR,
-            x_raw,
+            self.representative_input(),
             num_mc=4,
             seed=0,
-            taus=taus,
             L=4,
         )
 
