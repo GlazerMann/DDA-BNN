@@ -45,7 +45,7 @@ def _post() -> None:
             path = root / path
         globals()[key] = path
         setattr(ns, key, path)
-    ns.ARTIFACT_DIR.mkdir(exist_ok=True)
+    ns.ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
     globals()["DEVICE"] = ns.DEVICE = _device(globals()["DEVICE"])
 
