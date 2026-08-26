@@ -121,6 +121,53 @@ class ReleaseInferenceTests(unittest.TestCase):
         self.assertTrue((quantiles["q05"] <= quantiles["q50"]).all())
         self.assertTrue((quantiles["q50"] <= quantiles["q95"]).all())
 
+    def test_physical_auto_taus_matches_explicit_taus(self) -> None:
+        x_raw = self.representative_input()
+        taus = self.load_taus()
+
+        explicit = run_inference_phys(
+            MODEL_DIR, x_raw, num_mc=4, seed=0, taus=taus, L=4
+        )
+        automatic = run_inference_phys(
+            MODEL_DIR, x_raw, num_mc=4, seed=0, L=4
+        )
+
+        for index, label in enumerate(("mean", "std_ale", "std_epi", "std_tot")):
+            with self.subTest(output=label):
+                np.testing.assert_allclose(
+                    automatic[index], explicit[index], rtol=1e-6, atol=1e-7
+                )
+
+        self.assertEqual(automatic[4].keys(), explicit[4].keys())
+        for key in automatic[4]:
+            with self.subTest(quantile=key):
+                np.testing.assert_allclose(
+                    automatic[4][key], explicit[4][key], rtol=1e-6, atol=1e-7
+                )
+
+    def test_latent_auto_taus_matches_explicit_taus(self) -> None:
+        x_raw = self.representative_input()
+        taus = self.load_taus()
+
+        explicit = run_inference_latent(
+            MODEL_DIR, x_raw, num_mc=4, seed=0, taus=taus
+        )
+        automatic = run_inference_latent(
+            MODEL_DIR, x_raw, num_mc=4, seed=0
+        )
+
+        for index, label in enumerate(("mean", "std_ale", "std_epi")):
+            explicit_values = explicit[index]
+            automatic_values = automatic[index]
+            with self.subTest(output=label):
+                self.assertEqual(explicit_values is None, automatic_values is None)
+                if explicit_values is not None:
+                    np.testing.assert_allclose(
+                        automatic_values.numpy(),
+                        explicit_values.numpy(),
+                        rtol=1e-6,
+                        atol=1e-7,
+                    )
 
 if __name__ == "__main__":
     unittest.main()
