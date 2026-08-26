@@ -54,6 +54,14 @@ def apply_config_used(cfg_module, cfg_dict: dict):
             setattr(cfg_module, k, v)
 
 
+def _apply_run_config(run_dir: Path) -> None:
+    """Apply config_used.yaml before reading any run-specific configuration."""
+    cfg_path = run_dir / "config_used.yaml"
+    if cfg_path.exists():
+        with cfg_path.open("r") as stream:
+            apply_config_used(cfg, yaml.safe_load(stream))
+
+
 def resolve_run_dir(model_dir: Union[str, Path]) -> Path:
     """Resolve a model directory path, finding the latest run if needed."""
     p = Path(model_dir).expanduser()
