@@ -22,7 +22,7 @@ MODEL_DIR = PROJECT_ROOT / "release" / "chosen_model"
 
 
 class RepositoryValidationTests(unittest.TestCase):
-   def test_expected_default_configs_exist(self) -> None:
+    def test_expected_default_configs_exist(self) -> None:
        for package in ("release", "training"):
            path = PROJECT_ROOT / package / "configs" / "default.yaml"
            with self.subTest(package=package):
