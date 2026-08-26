@@ -39,12 +39,12 @@ def _post() -> None:
     globals()["ROOT_DIR"] = root
     ns.ROOT_DIR = root
 
-   for key in ("DATA_FILE", "ARTIFACT_DIR"):
-       path = Path(globals()[key])
-       if not path.is_absolute():
-           path = root / path
-       globals()[key] = path
-       setattr(ns, key, path)
+    for key in ("DATA_FILE", "ARTIFACT_DIR"):
+        path = Path(globals()[key])
+        if not path.is_absolute():
+            path = root / path
+        globals()[key] = path
+        setattr(ns, key, path)
 
     globals()["DEVICE"] = ns.DEVICE = _device(globals()["DEVICE"])
 
