@@ -38,12 +38,13 @@ jobs:
           miniforge-version: 26.5.3-0
           conda-solver: libmamba
 
-      - name: Check Python syntax
+      - name: Check Python syntax and warnings
         run: >-
-          python -m compileall -q
+          python -W error::SyntaxWarning -m compileall -q
           release
           training
           analysis
+          tests
           data/ADDA_run_example/make_orientations.py
 
       - name: Run repository tests
