@@ -127,7 +127,7 @@ def _taus_to_array(
     taus: Union[None, Dict[str, float], np.ndarray, torch.Tensor],
     dtype
 ) -> Optional[torch.Tensor]:
-    """Convert tau values to a finite, non-negative tensor of shape (D,)."""
+    """Convert tau values (dict, array, or tensor) to a tensor of shape (D,)."""
     if taus is None:
         return None
 
@@ -278,6 +278,7 @@ def run_inference_latent(
         mu_lat_s_cpu,
         std_ale_lat_s_cpu,
     )
+
 
 def stats_from_nested_cloud(y_kl: np.ndarray, quantiles=(0.05, 0.5, 0.95)):
     """
