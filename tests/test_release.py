@@ -24,9 +24,20 @@ MODEL_DIR = PROJECT_ROOT / "release" / "chosen_model"
 class RepositoryValidationTests(unittest.TestCase):
     def test_expected_default_configs_exist(self) -> None:
         for package in ("release", "training"):
-            path = PROJECT_ROOT / package / "configs" / "default.yaml"
+            config_dir = PROJECT_ROOT / package / "configs"
+            names = {path.name for path in config_dir.iterdir()}
+            expected = config_dir / "default.yaml"
             with self.subTest(package=package):
-                self.assertTrue(path.is_file(), f"Missing expected config: {path}")
+                self.assertIn(
+                    "default.yaml",
+                    names,
+                    f"Missing expected config: {expected}",
+                )
+                self.assertNotIn(
+                    "default.YAML",
+                    names,
+                    "Legacy uppercase config filename must not remain",
+                )
 
     def test_configuration_files_are_valid_yaml(self) -> None:
         config_files = sorted(
