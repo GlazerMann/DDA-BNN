@@ -47,20 +47,38 @@ def split_output(out: torch.Tensor):
     return mu, std
 
 
-def apply_config_used(cfg_module, cfg_dict: dict):
-    """Apply saved config values to the config module."""
-    for k, v in (cfg_dict or {}).items():
+# Capture the fully post-processed import-time configuration (resolved paths
+# and torch.device included). Each inference call resets to this state before
+# applying a run's saved configuration so values omitted by one run cannot
+# leak in from a previous run.
+_BASE_CONFIG = {
+    key: getattr(cfg, key)
+    for key in getattr(cfg, "_baseline", {})
+    if hasattr(cfg, key)
+}
+
+def apply_config_used(cfg_module, cfg_dict: dict | None):
+    """Apply saved config values to module globals and its namespace mirror."""
+    if cfg_dict is None:
+        return
+    if not isinstance(cfg_dict, dict):
+        raise ValueError("config_used.yaml must contain a mapping")
+
+    namespace = getattr(cfg_module, "ns", None)
+    for k, v in cfg_dict.items():
         if k.isupper() and hasattr(cfg_module, k):
             setattr(cfg_module, k, v)
-
+            if namespace is not None:
+                setattr(namespace, k, v)
 
 def _apply_run_config(run_dir: Path) -> None:
-    """Apply config_used.yaml before reading any run-specific configuration."""
+    """Reset to baseline, then apply config_used.yaml for one model run."""
+    apply_config_used(cfg, _BASE_CONFIG)
+
     cfg_path = run_dir / "config_used.yaml"
     if cfg_path.exists():
         with cfg_path.open("r") as stream:
             apply_config_used(cfg, yaml.safe_load(stream))
-
 
 def resolve_run_dir(model_dir: Union[str, Path]) -> Path:
     """Resolve a model directory path, finding the latest run if needed."""
@@ -109,15 +127,28 @@ def _taus_to_array(
     taus: Union[None, Dict[str, float], np.ndarray, torch.Tensor],
     dtype
 ) -> Optional[torch.Tensor]:
-    """Convert tau values (dict, array, or tensor) to a tensor of shape (D,)."""
+    """Convert tau values to a finite, non-negative tensor of shape (D,)."""
     if taus is None:
         return None
+
     if isinstance(taus, dict):
-        arr = torch.tensor([float(taus[t]) for t in cfg.TARGETS], dtype=dtype)
+        missing = [target for target in cfg.TARGETS if target not in taus]
+        if missing:
+            raise ValueError(
+                "taus mapping is missing target(s): " + ", ".join(missing)
+            )
+        arr = torch.tensor(
+            [float(taus[target]) for target in cfg.TARGETS],
+            dtype=dtype,
+        )
     else:
         arr = torch.as_tensor(taus, dtype=dtype)
     if arr.ndim != 1 or arr.shape[0] != len(cfg.TARGETS):
         raise ValueError(f"taus must be shape (D,), got {tuple(arr.shape)}")
+    if not bool(torch.isfinite(arr).all()):
+        raise ValueError("taus must contain only finite values")
+    if bool((arr < 0).any()):
+        raise ValueError("taus must be non-negative")
     return arr
 
 
@@ -135,12 +166,12 @@ def _resolve_taus(
     run_dir: Path,
     dtype,
 ) -> Optional[torch.Tensor]:
-    """Resolve the taus argument:
-    - "auto" (default) -> load from run_dir/taus.json, or None if missing
-    - None             -> no calibration scaling
-    - dict / array / tensor -> use directly
-    """
-    if isinstance(taus, str) and taus.lower() == "auto":
+    """Resolve automatic or explicit uncertainty-temperature scaling."""
+    if isinstance(taus, str):
+        if taus.casefold() != "auto":
+            raise ValueError(
+                "taus string value must be 'auto'; use None to disable scaling"
+            )
         taus = _load_taus_from_run_dir(run_dir)
     return _taus_to_array(taus, dtype)
 
@@ -248,7 +279,6 @@ def run_inference_latent(
         std_ale_lat_s_cpu,
     )
 
-
 def stats_from_nested_cloud(y_kl: np.ndarray, quantiles=(0.05, 0.5, 0.95)):
     """
     Compute statistics from nested Monte Carlo samples.
@@ -343,3 +373,4 @@ def run_inference_phys(
     y = inverse_phys_tf(t.reshape(S_eff * L * N, D), tf_info, tf_eps).reshape(S_eff, L, N, D)
 
     return stats_from_nested_cloud(y, quantiles=quantiles)
+
