@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 import torch
@@ -13,9 +14,43 @@ from release import config as cfg
 import release.inference_api as inference_api
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_DIR = PROJECT_ROOT / "release" / "chosen_model"
+
+
 class ReleaseInferenceHelperTests(unittest.TestCase):
+    @staticmethod
+    def representative_input() -> np.ndarray:
+        return np.array(
+            [[
+                28.0,
+                1.0,
+                0.0,
+                np.pi * 0.121537 / 0.7,
+                1.76891,
+                0.816859706,
+                0.121279497,
+                0.066140142,
+            ]],
+            dtype=np.float32,
+        )
     def tearDown(self) -> None:
         inference_api.apply_config_used(cfg, inference_api._BASE_CONFIG)
+
+    def test_apply_config_used_ignores_nonbaseline_module_state(self) -> None:
+        original_default_file = cfg._DEFAULT_FILE
+
+        inference_api.apply_config_used(
+            cfg,
+            {
+                "TF_EPS": 0.125,
+                "_DEFAULT_FILE": "must-not-be-applied",
+            },
+        )
+
+        self.assertEqual(cfg.TF_EPS, 0.125)
+        self.assertEqual(cfg.ns.TF_EPS, 0.125)
+        self.assertEqual(cfg._DEFAULT_FILE, original_default_file)
 
     def test_run_config_resets_missing_values_to_baseline_and_syncs_namespace(self) -> None:
         baseline_eps = inference_api._BASE_CONFIG["TF_EPS"]
@@ -38,6 +73,25 @@ class ReleaseInferenceHelperTests(unittest.TestCase):
             inference_api._apply_run_config(second_run)
             self.assertEqual(cfg.TF_EPS, baseline_eps)
             self.assertEqual(cfg.ns.TF_EPS, baseline_eps)
+
+    def test_physical_inference_disables_nested_tau_scaling(self) -> None:
+        """Physical inference must apply tau calibration exactly once."""
+        with patch.object(
+            inference_api,
+            "run_inference_latent",
+            wraps=inference_api.run_inference_latent,
+        ) as latent_mock:
+            inference_api.run_inference_phys(
+                MODEL_DIR,
+                self.representative_input(),
+                num_mc=4,
+                seed=0,
+                L=4,
+            )
+
+        latent_mock.assert_called_once()
+        self.assertIn("taus", latent_mock.call_args.kwargs)
+        self.assertIsNone(latent_mock.call_args.kwargs["taus"])
 
     def test_unknown_tau_string_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "must be 'auto'"):
