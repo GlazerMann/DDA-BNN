@@ -40,6 +40,21 @@ class TrainingInferenceTests(unittest.TestCase):
             training_api._BASE_CONFIG,
         )
 
+    def test_apply_config_used_ignores_nonbaseline_module_state(self) -> None:
+        original_default_file = training_cfg._DEFAULT_FILE
+
+        training_api.apply_config_used(
+            training_cfg,
+            {
+                "TF_EPS": 0.125,
+                "_DEFAULT_FILE": "must-not-be-applied",
+            },
+        )
+
+        self.assertEqual(training_cfg.TF_EPS, 0.125)
+        self.assertEqual(training_cfg.ns.TF_EPS, 0.125)
+        self.assertEqual(training_cfg._DEFAULT_FILE, original_default_file)
+
     def test_physical_inference_disables_nested_tau_scaling(self) -> None:
         """Physical inference must apply tau calibration exactly once."""
         with patch.object(
