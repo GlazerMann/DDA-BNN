@@ -69,7 +69,7 @@ def apply_config_used(cfg_module, cfg_dict: dict | None):
     # _DEFAULT_FILE. Replay only keys declared by the baseline configuration.
     valid_keys = set(getattr(cfg_module, "_baseline", {}))
     for k, v in cfg_dict.items():
-        if k in valid_keys and hasattr(cfg_module, k)
+        if k in valid_keys and hasattr(cfg_module, k):
             setattr(cfg_module, k, v)
             if namespace is not None:
                 setattr(namespace, k, v)
