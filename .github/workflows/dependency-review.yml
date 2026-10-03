@@ -10,9 +10,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# GitHub dependency review only sees ecosystems represented in the dependency
+# graph. The repository's Conda environment.yml is maintained separately by
+# Dependabot and is not covered by this action.
 jobs:
   dependency-review:
-    name: Review dependency changes
+    name: Review GitHub-supported dependency changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
