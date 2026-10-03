@@ -48,7 +48,6 @@ def _post() -> None:
             path = root / path
         globals()[key] = path
         setattr(ns, key, path)
-    ns.ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
     globals()["DEVICE"] = ns.DEVICE = _device(globals()["DEVICE"])
 
@@ -90,7 +89,7 @@ _post()
 
 def load(path: str | Path) -> None:
     """
-    Override the current configuration with another YAML or JSON file.
+    Load overrides on top of a fresh copy of the baseline configuration.
     Unknown keys raise KeyError.
     """
     path = Path(path).expanduser().resolve()
@@ -100,7 +99,11 @@ def load(path: str | Path) -> None:
     if unknown:
         raise KeyError(f"Unknown config keys: {', '.join(unknown)}")
 
-    _apply(data)
+    # Rebuild from raw baseline values so relative DATA_FILE and
+    # ARTIFACT_DIR entries are re-resolved if ROOT_DIR changes.
+    merged = dict(_baseline)
+    merged.update(data)
+    _apply(merged)
     _post()
 
 
