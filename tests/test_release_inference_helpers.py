@@ -37,20 +37,31 @@ class ReleaseInferenceHelperTests(unittest.TestCase):
     def tearDown(self) -> None:
         inference_api.apply_config_used(cfg, inference_api._BASE_CONFIG)
 
-    def test_apply_config_used_ignores_nonbaseline_module_state(self) -> None:
+    def test_apply_config_used_ignores_nonbaseline_and_runtime_state(self) -> None:
         original_default_file = cfg._DEFAULT_FILE
+        original_runtime = {
+            key: getattr(cfg, key)
+            for key in inference_api._RUNTIME_CONFIG_KEYS
+        }
 
         inference_api.apply_config_used(
             cfg,
             {
                 "TF_EPS": 0.125,
                 "_DEFAULT_FILE": "must-not-be-applied",
+                "ROOT_DIR": "/training-host/root",
+                "DATA_FILE": "/training-host/data.csv",
+                "ARTIFACT_DIR": "/training-host/artifacts",
+                "DEVICE": "cuda",
             },
         )
 
         self.assertEqual(cfg.TF_EPS, 0.125)
         self.assertEqual(cfg.ns.TF_EPS, 0.125)
         self.assertEqual(cfg._DEFAULT_FILE, original_default_file)
+        for key, value in original_runtime.items():
+            self.assertEqual(getattr(cfg, key), value)
+            self.assertEqual(getattr(cfg.ns, key), value)
 
     def test_run_config_resets_missing_values_to_baseline_and_syncs_namespace(self) -> None:
         baseline_eps = inference_api._BASE_CONFIG["TF_EPS"]
@@ -101,16 +112,16 @@ class ReleaseInferenceHelperTests(unittest.TestCase):
                 torch.float32,
             )
 
-    def test_tau_values_must_be_finite_and_non_negative(self) -> None:
+    def test_tau_values_must_be_finite_and_strictly_positive(self) -> None:
         with self.assertRaisesRegex(ValueError, "finite"):
             inference_api._taus_to_array(
                 np.array([1.0, np.nan, 1.0]),
                 torch.float32,
             )
 
-        with self.assertRaisesRegex(ValueError, "non-negative"):
+        with self.assertRaisesRegex(ValueError, "strictly positive"):
             inference_api._taus_to_array(
-                np.array([1.0, -0.5, 1.0]),
+                np.array([1.0, 0.0, 1.0]),
                 torch.float32,
             )
 
@@ -121,6 +132,13 @@ class ReleaseInferenceHelperTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "missing target"):
             inference_api._taus_to_array(incomplete, torch.float32)
+
+
+    def test_tau_mapping_rejects_unexpected_targets(self) -> None:
+        unexpected = {target: 1.0 for target in cfg.TARGETS}
+        unexpected["not-a-target"] = 1.0
+        with self.assertRaisesRegex(ValueError, "unexpected target"):
+            inference_api._taus_to_array(unexpected, torch.float32)
 
 
 if __name__ == "__main__":

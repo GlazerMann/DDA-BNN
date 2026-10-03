@@ -66,6 +66,10 @@ Both inference entry points default to `taus="auto"`, which loads
 `taus.json` from the resolved model run when it is present. Pass
 `taus=None` explicitly to request raw, uncalibrated uncertainty.
 
+Saved run configuration is used only for model/inference semantics. Runtime
+paths and the training machine's `DEVICE` are not replayed; inference uses the
+current host's configured device or an explicit `device=` argument.
+
 **Returns** (all NumPy arrays of shape `(N, 3)` for targets Qext, SSA, g):
 
 | Output | Description |

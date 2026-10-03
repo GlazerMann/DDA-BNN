@@ -47,27 +47,25 @@ def split_output(out: torch.Tensor):
     return mu, std
 
 
-# Capture the fully post-processed import-time configuration (resolved paths
-# and torch.device included). Each inference call resets to this state before
-# applying a run's saved configuration so values omitted by one run cannot
-# leak in from a previous run.
+# Saved training runs contain both model semantics and machine-specific
+# runtime state. Replay only semantic keys during inference: paths and DEVICE
+# belong to the current inference host, not the training host.
+_RUNTIME_CONFIG_KEYS = frozenset({"ROOT_DIR", "DATA_FILE", "ARTIFACT_DIR", "DEVICE"})
 _BASE_CONFIG = {
     key: getattr(cfg, key)
     for key in getattr(cfg, "_baseline", {})
-    if hasattr(cfg, key)
+    if key not in _RUNTIME_CONFIG_KEYS and hasattr(cfg, key)
 }
 
 def apply_config_used(cfg_module, cfg_dict: dict | None):
-    """Apply saved config values to module globals and its namespace mirror."""
+    """Apply saved semantic config values to globals and the namespace mirror."""
     if cfg_dict is None:
         return
     if not isinstance(cfg_dict, dict):
         raise ValueError("config_used.yaml must contain a mapping")
 
     namespace = getattr(cfg_module, "ns", None)
-    # Older saved configs may contain module bookkeeping fields such as
-    # _DEFAULT_FILE. Replay only keys declared by the baseline configuration.
-    valid_keys = set(getattr(cfg_module, "_baseline", {}))
+    valid_keys = set(_BASE_CONFIG)
     for k, v in cfg_dict.items():
         if k in valid_keys and hasattr(cfg_module, k):
             setattr(cfg_module, k, v)
@@ -75,12 +73,12 @@ def apply_config_used(cfg_module, cfg_dict: dict | None):
                 setattr(namespace, k, v)
 
 def _apply_run_config(run_dir: Path) -> None:
-    """Reset to baseline, then apply config_used.yaml for one model run."""
+    """Reset semantic config, then apply config_used.yaml for one model run."""
     apply_config_used(cfg, _BASE_CONFIG)
 
     cfg_path = run_dir / "config_used.yaml"
     if cfg_path.exists():
-        with cfg_path.open("r") as stream:
+        with cfg_path.open("r", encoding="utf-8") as stream:
             apply_config_used(cfg, yaml.safe_load(stream))
 
 def resolve_run_dir(model_dir: Union[str, Path]) -> Path:
@@ -135,10 +133,16 @@ def _taus_to_array(
         return None
 
     if isinstance(taus, dict):
+        target_names = set(cfg.TARGETS)
         missing = [target for target in cfg.TARGETS if target not in taus]
         if missing:
             raise ValueError(
                 "taus mapping is missing target(s): " + ", ".join(missing)
+            )
+        unexpected = sorted(set(taus) - target_names)
+        if unexpected:
+            raise ValueError(
+                "taus mapping has unexpected target(s): " + ", ".join(unexpected)
             )
         arr = torch.tensor(
             [float(taus[target]) for target in cfg.TARGETS],
@@ -150,8 +154,8 @@ def _taus_to_array(
         raise ValueError(f"taus must be shape (D,), got {tuple(arr.shape)}")
     if not bool(torch.isfinite(arr).all()):
         raise ValueError("taus must contain only finite values")
-    if bool((arr < 0).any()):
-        raise ValueError("taus must be non-negative")
+    if bool((arr <= 0).any()):
+        raise ValueError("taus must be strictly positive")
     return arr
 
 
@@ -211,6 +215,8 @@ def run_inference_latent(
 
     if device is None:
         device = torch.device(cfg.DEVICE) if isinstance(cfg.DEVICE, str) else cfg.DEVICE
+    else:
+        device = torch.device(device)
     num_mc = int(num_mc or getattr(cfg, "BAYES_NUM_SAMPLES", 50))
 
     meta = torch.load(run_dir / "data_meta.pt", map_location="cpu", weights_only=False)
@@ -223,7 +229,18 @@ def run_inference_latent(
         raise ValueError(f"Input must have shape (N,{n_expected}), got {X.shape}")
     xb = torch.tensor(scale_like_training_np(X, x_scaler), dtype=torch.float32, device=device)
 
-    model = HybridNet(xb.shape[1]).to(device)
+    # HybridNet creates Bayesian priors on cfg.DEVICE. Temporarily synchronize
+    # that construction-time setting with the caller-selected inference device
+    # without allowing a saved training DEVICE to leak into future calls.
+    previous_device = cfg.DEVICE
+    previous_ns_device = cfg.ns.DEVICE
+    cfg.DEVICE = cfg.ns.DEVICE = device
+    try:
+        model = HybridNet(xb.shape[1]).to(device)
+    finally:
+        cfg.DEVICE = previous_device
+        cfg.ns.DEVICE = previous_ns_device
+
     state = torch.load(run_dir / "model.pth", map_location=device, weights_only=False)
     state = {k: v for k, v in state.items() if not k.startswith("guide.")}
     model.load_state_dict(state, strict=False)
@@ -234,7 +251,7 @@ def run_inference_latent(
     pyro_path = run_dir / "pyro_params.pt"
     has_pyro = pyro_path.exists() and getattr(model, "has_bayes", False)
     if has_pyro:
-        pyro.get_param_store().load(str(pyro_path))
+        pyro.get_param_store().load(str(pyro_path), map_location=device)
         model.guide(xb[:1])
 
     if has_pyro:
