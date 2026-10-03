@@ -40,20 +40,31 @@ class TrainingInferenceTests(unittest.TestCase):
             training_api._BASE_CONFIG,
         )
 
-    def test_apply_config_used_ignores_nonbaseline_module_state(self) -> None:
+    def test_apply_config_used_ignores_nonbaseline_and_runtime_state(self) -> None:
         original_default_file = training_cfg._DEFAULT_FILE
+        original_runtime = {
+            key: getattr(training_cfg, key)
+            for key in training_api._RUNTIME_CONFIG_KEYS
+        }
 
         training_api.apply_config_used(
             training_cfg,
             {
                 "TF_EPS": 0.125,
                 "_DEFAULT_FILE": "must-not-be-applied",
+                "ROOT_DIR": "/training-host/root",
+                "DATA_FILE": "/training-host/data.csv",
+                "ARTIFACT_DIR": "/training-host/artifacts",
+                "DEVICE": "cuda",
             },
         )
 
         self.assertEqual(training_cfg.TF_EPS, 0.125)
         self.assertEqual(training_cfg.ns.TF_EPS, 0.125)
         self.assertEqual(training_cfg._DEFAULT_FILE, original_default_file)
+        for key, value in original_runtime.items():
+            self.assertEqual(getattr(training_cfg, key), value)
+            self.assertEqual(getattr(training_cfg.ns, key), value)
 
     def test_physical_inference_disables_nested_tau_scaling(self) -> None:
         """Physical inference must apply tau calibration exactly once."""
@@ -113,6 +124,23 @@ class TrainingInferenceTests(unittest.TestCase):
             training_api._apply_run_config(second_run)
             self.assertEqual(training_cfg.TF_EPS, baseline_eps)
             self.assertEqual(training_cfg.ns.TF_EPS, baseline_eps)
+
+
+    def test_tau_values_must_be_strictly_positive(self) -> None:
+        with self.assertRaisesRegex(ValueError, "strictly positive"):
+            training_api._taus_to_array(
+                np.array([1.0, 0.0, 1.0]),
+                training_api.torch.float32,
+            )
+
+    def test_tau_mapping_rejects_unexpected_targets(self) -> None:
+        unexpected = {target: 1.0 for target in training_cfg.TARGETS}
+        unexpected["not-a-target"] = 1.0
+        with self.assertRaisesRegex(ValueError, "unexpected target"):
+            training_api._taus_to_array(
+                unexpected,
+                training_api.torch.float32,
+            )
 
 
 if __name__ == "__main__":
