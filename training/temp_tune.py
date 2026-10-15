@@ -125,8 +125,16 @@ def load_latent_components(df: pd.DataFrame, targets):
         return "posterior", mu_lat_s, std_ale_lat_s
     # fallback Gaussian mode
     mu_lat = np.stack([df[f"mu_lat_mean_{t}"].to_numpy() for t in targets], axis=1)
-    std_epi_lat = np.stack([df[f"std_epi_lat_{t}"].to_numpy() for t in targets], axis=1)
-    std_ale_lat = np.stack([df[f"std_ale_lat_{t}"].to_numpy() for t in targets], axis=1)
+    if not any(f"std_epi_lat_{t}" in df or f"std_ale_lat_{t}" in df for t in targets):
+        raise ValueError("Temperature calibration requires a latent uncertainty estimate")
+    std_epi_lat = np.stack([
+        df[f"std_epi_lat_{t}"].to_numpy() if f"std_epi_lat_{t}" in df else np.zeros(N)
+        for t in targets
+    ], axis=1)
+    std_ale_lat = np.stack([
+        df[f"std_ale_lat_{t}"].to_numpy() if f"std_ale_lat_{t}" in df else np.zeros(N)
+        for t in targets
+    ], axis=1)
     return "gaussian", mu_lat, std_epi_lat, std_ale_lat
 
 # ---------------- sampling + stats in physical space ----------------
