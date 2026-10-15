@@ -137,7 +137,7 @@ class HybridNet(PyroModule):
             # Map raw -> bounded log-variance, then to variance/std for the Normal
             log_var = cfg.LOG_VAR_MIN + (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) * torch.sigmoid(raw)
             var = torch.exp(log_var) + eps
-            scale = torch.sqrt(var)
+            scale = torch.sqrt(var) if self.use_predicted_std else torch.ones_like(mu)
             dist_y = dist.Normal(mu, scale).to_event(1)
 
         elif mode == "full":
@@ -149,7 +149,9 @@ class HybridNet(PyroModule):
                                               (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN)
                                               * torch.sigmoid(raw_log_var))) + eps
             cov           = build_cov_from_params(sigma, rho_raw)
-            dist_y        = dist.MultivariateNormal(mu, covariance_matrix=cov)
+            dist_y = (dist.MultivariateNormal(mu, covariance_matrix=cov)
+                      if self.use_predicted_std
+                      else dist.Normal(mu, torch.ones_like(mu)).to_event(1))
 
         else:
             raise RuntimeError(f"bad cfg.UNCERTAINTY_MODE '{cfg.UNCERTAINTY_MODE}'")
