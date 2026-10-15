@@ -60,11 +60,17 @@ def _apply_target_forward(df_targets):
 # helper: dummy scaler when Z-score is disabled
 # ──────────────────────────────────────────────────────────────────────
 class IdentityScaler:
-    def fit(self, x):               return self
+    """No-op scaler; NaN means missing and maps to zero at the caller boundary."""
+    def fit(self, x):
+        x = np.asarray(x)
+        if x.ndim != 2:
+            raise ValueError("IdentityScaler expects a 2-D input array")
+        self._dim = x.shape[1]
+        return self
 
     def transform(self, x):         return x
 
-    def fit_transform(self, x):     return x
+    def fit_transform(self, x):     return self.fit(x).transform(x)
 
     def inverse_transform(self, x): return x
 
@@ -191,6 +197,9 @@ def load_dataset(path: Path,
     cols.extend(low_res_cols)
 
     X_raw = np.column_stack(cols)
+    # Missing values use NaN; infinity is never a valid input to the network.
+    if np.isinf(X_raw).any():
+        raise ValueError("Infinite feature values are invalid; use NaN for missing")
     low_res_raw = X_raw[:, -len(targets):]
 
     # ------------------ build y_raw (latent/forward-transformed) -------

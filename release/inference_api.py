@@ -70,6 +70,9 @@ def resolve_run_dir(model_dir: Union[str, Path]) -> Path:
 def scale_like_training_np(X_raw: np.ndarray, x_scaler) -> np.ndarray:
     """Scale input features using the training scaler, handling NaN values."""
     X_raw = np.asarray(X_raw, dtype=np.float32)
+    # Only NaN denotes a missing feature; infinity is invalid, not missing.
+    if np.isinf(X_raw).any():
+        raise ValueError("Infinite feature values are invalid; use NaN for missing")
     mask = np.isnan(X_raw)
     # Use training-time means rather than statistics of this inference batch.
     filled = np.where(mask, x_scaler.mean_, X_raw)
