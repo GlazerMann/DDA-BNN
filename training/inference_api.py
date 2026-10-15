@@ -69,6 +69,11 @@ def find_latest_run_dir(root: str | Path | None = None) -> Path:
 # ---------------- utils (keep yours) ----------------
 # Saved run configs include machine-specific runtime state. Inference replays
 # only model semantics; paths and DEVICE belong to the current host.
+# CONTRACT: cfg and Pyro's parameter store are process-global and mutated by
+# run_inference_*; do not interleave calls for different runs in one process.
+# Serialize inference calls or isolate each model run in a separate process.
+# Model directories must be trusted: torch.load(weights_only=False) can execute
+# arbitrary code when deserializing malicious pickle data.
 _RUNTIME_CONFIG_KEYS = frozenset({"ROOT_DIR", "DATA_FILE", "ARTIFACT_DIR", "DEVICE"})
 _BASE_CONFIG = {
     key: getattr(cfg, key)
