@@ -74,6 +74,12 @@ class IdentityScaler:
     @scale_.setter
     def scale_(self, v):            self._dim = len(v)
 
+    @property
+    def n_features_in_(self):      return self._dim
+
+    @property
+    def mean_(self):               return np.zeros(self._dim)
+
 
 # ──────────────────────────────────────────────────────────────────────
 # feature helpers
@@ -214,7 +220,10 @@ def load_dataset(path: Path,
         x_scaler = IdentityScaler(); x_scaler.scale_ = np.ones(X_raw.shape[1])
         y_scaler = IdentityScaler(); y_scaler.scale_ = np.ones(y_raw_np.shape[1])
 
-        X_tr, X_va, X_te = X_raw[idx_tr], X_raw[idx_va], X_raw[idx_te]
+        # In no-scaling mode, missing features still need the same zero fill
+        # as production inference; never pass NaNs through to the network.
+        X_tr, X_va, X_te = (np.where(np.isnan(X_raw[idx]), 0.0, X_raw[idx])
+                             for idx in (idx_tr, idx_va, idx_te))
         y_tr, y_va, y_te = y_raw_np[idx_tr], y_raw_np[idx_va], y_raw_np[idx_te]
 
     # -----------------------------------------------------------------
