@@ -152,6 +152,8 @@ def split_output(out: torch.Tensor):
     sigma = torch.exp(0.5 * smooth_logvar(raw_log_var))
     cov = build_cov_from_params(sigma, rho_raw)
 
+    # MARGINAL-ONLY API: cross-target covariance is discarded by this return.
+    # Joint predictions require carrying cov (or its Cholesky factor) forward.
     std = torch.sqrt(torch.diagonal(cov, dim1=-2, dim2=-1))
     return mu, std  # keep interface unchanged (mu, std)
 

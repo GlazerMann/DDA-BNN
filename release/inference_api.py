@@ -42,6 +42,8 @@ def split_output(out: torch.Tensor):
     sigma = torch.exp(0.5 * smooth_logvar(raw_log_var))
     cov = build_cov_from_params(sigma, rho_raw)
 
+    # MARGINAL-ONLY API: discard off-diagonal covariances here. This is
+    # adequate for per-target stds but not joint predictive correlations.
     std = torch.sqrt(torch.diagonal(cov, dim1=-2, dim2=-1))
     return mu, std
 
@@ -292,6 +294,9 @@ def run_inference_phys(
     mu_lat_s_cal = mu_bar + tau_np[None, None, :] * (mu_lat_s_np - mu_bar)
     std_ale_lat_s_cal = tau_np[None, None, :] * std_ale_lat_s_np
 
+    # This sampler has only marginal stds, not covariance matrices; each
+    # target's aleatoric perturbation is sampled independently even in 'full'.
+    # Do not interpret the resulting cloud as a joint correlated prediction.
     rng = np.random.default_rng(seed)
     eps = rng.standard_normal(size=(S_eff, L, N, D)).astype(np.float32)
     t = mu_lat_s_cal[:, None, :, :] + std_ale_lat_s_cal[:, None, :, :] * eps
