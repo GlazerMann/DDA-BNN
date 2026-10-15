@@ -147,7 +147,18 @@ _dl_generator.manual_seed(cfg.SEED if cfg.SEED is not None else 0)
 
 
 def _balanced_sample_weights(y_tr: np.ndarray, targets: list[str]) -> np.ndarray:
-    """Compute positive, normalized per-example weights for configured targets."""
+    """Compute normalized weights from transformed training targets.
+
+    Requires a nonempty 2-D array of finite values. A constant target is
+    valid: all samples then share its single occupied histogram bin.
+    """
+    y_tr = np.asarray(y_tr)
+    if y_tr.ndim != 2 or y_tr.shape[0] == 0 or y_tr.shape[1] != len(targets):
+        raise ValueError("Balancing requires a nonempty 2-D training target array")
+    if not np.isfinite(y_tr).all():
+        raise ValueError("Balancing requires finite transformed training targets")
+    if not cfg.BALANCE_TARGETS:
+        raise ValueError("Balancing requires at least one selected target")
     strategy = cfg.BALANCE_STRATEGY
     if strategy not in {"prod", "mean", "max"}:
         raise ValueError("cfg.BALANCE_STRATEGY must be 'prod', 'mean', or 'max'")
