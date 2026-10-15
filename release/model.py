@@ -30,28 +30,19 @@ def head_size(d, mode):
 
 
 def build_cov_from_params(sigma, rho_raw):
-    """
-    Build covariance matrix from standard deviations and correlation parameters.
+    """Build a positive-definite covariance using a Cholesky factor.
 
-    Args:
-        sigma: (B, d) positive standard deviations
-        rho_raw: (B, d*(d-1)//2) unconstrained correlation parameters
-
-    Returns:
-        Full covariance matrix Σ = D R D
+    RHO_MAX bounds the normalized lower-triangular entries, not pairwise
+    Pearson correlations.
     """
-    B, d = sigma.shape
-    R = torch.eye(d, device=sigma.device).repeat(B, 1, 1)
+    _, d = sigma.shape
+    L = torch.diag_embed(sigma)
     idx = 0
     for i in range(1, d):
         for j in range(i):
-            rho = cfg.RHO_MAX * torch.tanh(rho_raw[:, idx])
-            R[:, i, j] = rho
-            R[:, j, i] = rho
+            L[:, i, j] = sigma[:, i] * cfg.RHO_MAX * torch.tanh(rho_raw[:, idx])
             idx += 1
-    D = torch.diag_embed(sigma)
-    cov = D @ R @ D
-    return cov
+    return L @ L.transpose(-1, -2)
 
 
 class HybridNet(PyroModule):
@@ -184,23 +175,14 @@ def gaussian_nll_diag(output: torch.Tensor, target: torch.Tensor, d: int):
 
 
 def gaussian_nll_full(output: torch.Tensor, target: torch.Tensor, d: int):
-    """Negative log-likelihood for full covariance Gaussian with packed Cholesky factor."""
-    B = output.size(0)
-    mu, pack = output[:, :d], output[:, d:]
-
-    L = torch.zeros(B, d, d, device=output.device)
-    k = 0
-    for i in range(d):
-        for j in range(i + 1):
-            v = pack[:, k]
-            L[:, i, j] = torch.nn.functional.softplus(v) + 1e-3 if i == j else v
-            k += 1
-
-    diff = (target - mu).unsqueeze(-1)
-    inv = torch.cholesky_solve(diff, L)
-    maha = (diff.transpose(-1, -2) @ inv).squeeze(-1).squeeze(-1)
-    logdet = 2.0 * torch.log(torch.diagonal(L, dim1=1, dim2=2)).sum(-1)
-    return 0.5 * (maha + logdet).mean()
+    """Full-covariance NLL matching the model likelihood parameterization."""
+    mu, params = output[:, :d], output[:, d:]
+    raw_log_var, rho_raw = params[:, :d], params[:, d:]
+    sigma = torch.exp(0.5 * (cfg.LOG_VAR_MIN +
+                             (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) *
+                             torch.sigmoid(raw_log_var))) + 1e-6
+    cov = build_cov_from_params(sigma, rho_raw)
+    return -torch.distributions.MultivariateNormal(mu, covariance_matrix=cov).log_prob(target).mean()
 
 
 __all__ = [
