@@ -146,6 +146,38 @@ _dl_generator = torch.Generator()
 _dl_generator.manual_seed(cfg.SEED if cfg.SEED is not None else 0)
 
 
+def _balanced_sample_weights(y_tr: np.ndarray, targets: list[str]) -> np.ndarray:
+    """Compute positive, normalized per-example weights for configured targets."""
+    strategy = cfg.BALANCE_STRATEGY
+    if strategy not in {"prod", "mean", "max"}:
+        raise ValueError("cfg.BALANCE_STRATEGY must be 'prod', 'mean', or 'max'")
+    if cfg.N_BINS < 1:
+        raise ValueError("N_BINS must be positive")
+    weights = (np.ones(len(y_tr), dtype=np.float64) if strategy == "prod"
+               else np.zeros(len(y_tr), dtype=np.float64))
+    for tgt in cfg.BALANCE_TARGETS:
+        if tgt not in targets:
+            raise ValueError(f"{tgt} not among TARGETS {targets}")
+        vals = y_tr[:, targets.index(tgt)]
+        bins = np.linspace(vals.min(), vals.max(), cfg.N_BINS + 1)
+        bin_idx = np.clip(np.digitize(vals, bins) - 1, 0, cfg.N_BINS - 1)
+        freq = np.bincount(bin_idx, minlength=cfg.N_BINS)
+        inv_f = 1.0 / freq[bin_idx]
+        if strategy == "prod":
+            weights *= inv_f
+        elif strategy == "mean":
+            weights += inv_f
+        else:
+            weights = np.maximum(weights, inv_f)
+    if strategy == "mean":
+        weights /= len(cfg.BALANCE_TARGETS)
+    avg = weights.mean()
+    if not np.isfinite(avg) or avg <= 0:
+        raise ValueError("Invalid balancing weights")
+    weights = np.clip(weights, 0, 10 * avg)
+    return weights / weights.mean()
+
+
 def load_dataset(path: Path,
                  features: list[str],
                  targets: list[str],
@@ -224,29 +256,7 @@ def load_dataset(path: Path,
     sampler = None
     shuffle_flag = True
     if cfg.BALANCE_TARGETS:
-        weights = np.ones(len(y_tr), dtype=np.float32)
-        for tgt in cfg.BALANCE_TARGETS:
-            if tgt not in targets:
-                raise ValueError(f"{tgt} not among TARGETS {targets}")
-            col_idx = targets.index(tgt)
-            vals = y_tr[:, col_idx]  # transformed space (scaled if enabled)
-            bins = np.linspace(vals.min(), vals.max(), cfg.N_BINS + 1)
-            bin_idx = np.digitize(vals, bins) - 1
-            freq = np.bincount(bin_idx, minlength=cfg.N_BINS) + 1e-8
-            inv_f = 1.0 / freq[bin_idx]
-            if cfg.BALANCE_STRATEGY == "prod":
-                weights *= inv_f
-            elif cfg.BALANCE_STRATEGY == "mean":
-                weights += inv_f
-            elif cfg.BALANCE_STRATEGY == "max":
-                weights = np.maximum(weights, inv_f)
-            else:
-                raise ValueError("cfg.BALANCE_STRATEGY must be 'prod', 'mean', or 'max'")
-
-        weights = np.clip(weights, 0, 10 * weights.mean())
-        if cfg.BALANCE_STRATEGY == "mean":
-            weights /= len(cfg.BALANCE_TARGETS)
-        weights /= weights.mean()
+        weights = _balanced_sample_weights(y_tr, targets)
         sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
         shuffle_flag = False
 
