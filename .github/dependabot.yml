@@ -17,6 +17,8 @@ updates:
           - "minor"
           - "patch"
 
+  # Conda manifest version updates only (environment.yml); Dependabot does
+  # not update Conda lockfiles or perform a complete vulnerability scan.
   - package-ecosystem: conda
     directory: /
     schedule:
