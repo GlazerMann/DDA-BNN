@@ -32,14 +32,14 @@ def split_output(out: torch.Tensor):
     if mode == "diag":
         mu, raw = out[:, :d], out[:, d:]
         log_var = smooth_logvar(raw)
-        std = torch.exp(0.5 * log_var)
+        std = torch.sqrt(torch.exp(log_var) + 1e-6)
         return mu, std
 
     mu, params = out[:, :d], out[:, d:]
     raw_log_var = params[:, :d]
     rho_raw = params[:, d:]
 
-    sigma = torch.exp(0.5 * smooth_logvar(raw_log_var))
+    sigma = torch.exp(0.5 * smooth_logvar(raw_log_var)) + 1e-6
     cov = build_cov_from_params(sigma, rho_raw)
 
     # MARGINAL-ONLY API: discard off-diagonal covariances here. This is

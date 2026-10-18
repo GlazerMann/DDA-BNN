@@ -170,7 +170,7 @@ def gaussian_nll_diag(output: torch.Tensor, target: torch.Tensor, d: int):
     log_var = cfg.LOG_VAR_MIN + (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) * torch.sigmoid(raw)
     var = torch.exp(log_var) + 1e-6
     inv_var = var.reciprocal()
-    nll = 0.5 * (inv_var * (target - mu).pow(2) + log_var)
+    nll = 0.5 * (inv_var * (target - mu).pow(2) + var.log())
     return nll.sum(dim=-1).mean()
 
 

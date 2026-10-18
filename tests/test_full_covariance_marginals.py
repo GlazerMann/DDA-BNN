@@ -23,7 +23,7 @@ class MarginalCovarianceTests(unittest.TestCase):
                 params = out[:, 3:]
                 sigma = torch.exp(0.5 * (module.cfg.LOG_VAR_MIN +
                         (module.cfg.LOG_VAR_MAX - module.cfg.LOG_VAR_MIN) *
-                        torch.sigmoid(params[:, :3])))
+                        torch.sigmoid(params[:, :3]))) + 1e-6
                 cov = module.build_cov_from_params(sigma, params[:, 3:])
                 mean, std = splitter(out)
                 torch.testing.assert_close(mean, out[:, :3])

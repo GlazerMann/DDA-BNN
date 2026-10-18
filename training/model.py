@@ -201,8 +201,8 @@ def gaussian_nll_diag(output: torch.Tensor, target: torch.Tensor, d: int):
     log_var = cfg.LOG_VAR_MIN + (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) * torch.sigmoid(raw)
     var = torch.exp(log_var) + 1e-6
     inv_var = var.reciprocal()
-    # per-element NLL (no constant term): 0.5 * ( (y-mu)^2 / var + log_var )
-    nll = 0.5 * (inv_var * (target - mu).pow(2) + log_var)
+    # Use the stabilized variance in both terms (Gaussian constant omitted).
+    nll = 0.5 * (inv_var * (target - mu).pow(2) + var.log())
     # sum over target dims to match Pyro's to_event(1), then mean over batch
     return nll.sum(dim=-1).mean()
 
