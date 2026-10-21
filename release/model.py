@@ -33,7 +33,10 @@ def build_cov_from_params(sigma, rho_raw):
     """Build a positive-definite covariance using a Cholesky factor.
 
     RHO_MAX bounds the normalized lower-triangular entries, not pairwise
-    Pearson correlations.
+    Pearson correlations. sigma is the Cholesky diagonal: marginal variance
+    for target i equals sigma[i]**2 * (1 + sum(r[i,j]**2, j < i)). Hence
+    LOG_VAR_MIN/MAX do not bound all marginal variances, and TARGETS order
+    affects those marginal scales.
     """
     _, d = sigma.shape
     L = torch.diag_embed(sigma)
@@ -119,9 +122,9 @@ class HybridNet(PyroModule):
             mu, params = out[:, :d], out[:, d:]
             raw_log_var = params[:, :d]
             rho_raw = params[:, d:]
-            sigma = torch.exp(0.5 * (cfg.LOG_VAR_MIN +
+            sigma = torch.sqrt(torch.exp(cfg.LOG_VAR_MIN +
                                      (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN)
-                                     * torch.sigmoid(raw_log_var))) + eps
+                                     * torch.sigmoid(raw_log_var)) + eps)
             cov = build_cov_from_params(sigma, rho_raw)
             dist_y = dist.MultivariateNormal(mu, covariance_matrix=cov)
 
@@ -178,9 +181,9 @@ def gaussian_nll_full(output: torch.Tensor, target: torch.Tensor, d: int):
     """Full-covariance NLL matching the model likelihood parameterization."""
     mu, params = output[:, :d], output[:, d:]
     raw_log_var, rho_raw = params[:, :d], params[:, d:]
-    sigma = torch.exp(0.5 * (cfg.LOG_VAR_MIN +
+    sigma = torch.sqrt(torch.exp(cfg.LOG_VAR_MIN +
                              (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) *
-                             torch.sigmoid(raw_log_var))) + 1e-6
+                             torch.sigmoid(raw_log_var)) + 1e-6)
     cov = build_cov_from_params(sigma, rho_raw)
     return -torch.distributions.MultivariateNormal(mu, covariance_matrix=cov).log_prob(target).mean()
 

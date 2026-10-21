@@ -45,7 +45,10 @@ def build_cov_from_params(sigma, rho_raw):
 
     sigma gives positive Cholesky diagonal entries; bounded off-diagonals
     are scaled by their row's sigma. RHO_MAX is a factor bound, not a
-    bound on pairwise Pearson correlation.
+    bound on pairwise Pearson correlation. Specifically, for zero-indexed
+    target i, marginal variance is sigma[i]**2 * (1 + sum(r[i,j]**2,
+    j < i)); LOG_VAR_MIN/MAX bound the Cholesky diagonal variance, not
+    every marginal variance. The marginal scale depends on TARGETS order.
     """
     _, d = sigma.shape
     L = torch.diag_embed(sigma)
@@ -139,9 +142,9 @@ class HybridNet(PyroModule):
             mu, params    = out[:, :d], out[:, d:]
             raw_log_var   = params[:, :d]
             rho_raw       = params[:, d:]
-            sigma         = torch.exp(0.5 * (cfg.LOG_VAR_MIN +
+            sigma         = torch.sqrt(torch.exp(cfg.LOG_VAR_MIN +
                                               (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN)
-                                              * torch.sigmoid(raw_log_var))) + eps
+                                              * torch.sigmoid(raw_log_var)) + eps)
             cov           = build_cov_from_params(sigma, rho_raw)
             dist_y        = dist.MultivariateNormal(mu, covariance_matrix=cov)
 
@@ -211,9 +214,9 @@ def gaussian_nll_full(output: torch.Tensor, target: torch.Tensor, d: int):
     """NLL using exactly the covariance parameterization of HybridNet.forward."""
     mu, params = output[:, :d], output[:, d:]
     raw_log_var, rho_raw = params[:, :d], params[:, d:]
-    sigma = torch.exp(0.5 * (cfg.LOG_VAR_MIN +
+    sigma = torch.sqrt(torch.exp(cfg.LOG_VAR_MIN +
                              (cfg.LOG_VAR_MAX - cfg.LOG_VAR_MIN) *
-                             torch.sigmoid(raw_log_var))) + 1e-6
+                             torch.sigmoid(raw_log_var)) + 1e-6)
     cov = build_cov_from_params(sigma, rho_raw)
     return -torch.distributions.MultivariateNormal(mu, covariance_matrix=cov).log_prob(target).mean()
 

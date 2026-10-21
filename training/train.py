@@ -149,7 +149,7 @@ def split_output(out: torch.Tensor):
     raw_log_var = params[:, :d]  # d components
     rho_raw = params[:, d:]  # remaining
 
-    sigma = torch.exp(0.5 * smooth_logvar(raw_log_var)) + 1e-6
+    sigma = torch.sqrt(torch.exp(smooth_logvar(raw_log_var)) + 1e-6)
     cov = build_cov_from_params(sigma, rho_raw)
 
     # MARGINAL-ONLY API: cross-target covariance is discarded by this return.

@@ -30,7 +30,7 @@ class FullCovarianceTests(unittest.TestCase):
                 out = torch.randn((5, 9), requires_grad=True)  # D=3: 3 means + 6 params
                 truth = torch.randn((5, 3))
                 nll = m.gaussian_nll_full(out, truth, 3)
-                sigma = torch.exp(0.5 * (-10 + 7 * torch.sigmoid(out[:, 3:6]))) + 1e-6
+                sigma = torch.sqrt(torch.exp(-10 + 7 * torch.sigmoid(out[:, 3:6])) + 1e-6)
                 cov = m.build_cov_from_params(sigma, out[:, 6:])
                 want = -torch.distributions.MultivariateNormal(out[:, :3], covariance_matrix=cov).log_prob(truth).mean()
                 torch.testing.assert_close(nll, want)
