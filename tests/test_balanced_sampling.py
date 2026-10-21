@@ -25,9 +25,12 @@ class BalanceWeightTests(unittest.TestCase):
                 self.assertAlmostEqual(weights.mean(), 1.0)
 
     def test_max_bin_boundary_belongs_to_last_bin(self):
-        vals = np.array([[0.0], [0.0], [1.0], [1.0]])
+        # Unequal values within each half-bin make an extra bin for the
+        # maximum distinguishable from the intended rightmost bin. The
+        # pre-fix np.digitize() implementation fails this assertion.
+        vals = np.array([[0.0], [0.1], [0.9], [1.0]])
         with patch.object(data_utils.cfg, 'BALANCE_TARGETS', ['Qext']), \
-             patch.object(data_utils.cfg, 'BALANCE_STRATEGY', 'max'), \
+             patch.object(data_utils.cfg, 'BALANCE_STRATEGY', 'prod'), \
              patch.object(data_utils.cfg, 'N_BINS', 2):
             weights = data_utils._balanced_sample_weights(vals, ['Qext'])
             np.testing.assert_allclose(weights, np.ones(4))
