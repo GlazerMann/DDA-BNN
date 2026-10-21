@@ -96,7 +96,7 @@ def test_tau_fit_rejects_invalid_arrays(mu, std, truth):
 
 @pytest.mark.parametrize('failure', [
     'apply_nan', 'apply_negative', 'partial_posterior', 'apply_empty',
-    'val_nan', 'val_negative', 'val_empty', 'K_zero', 'L_zero', 'K_bool', 'L_fraction', 'seed_negative', 'seed_fraction', 'fit_failure',
+    'val_nan', 'val_negative', 'val_empty', 'K_zero', 'L_zero', 'K_bool', 'L_fraction', 'seed_negative', 'seed_fraction', 'fit_failure', 'sampling_failure',
 ])
 def test_invalid_input_preserves_existing_tau_and_output(tmp_path, monkeypatch, failure):
     monkeypatch.setattr(temp_tune.cfg, 'TARGETS', ['A', 'B'])
@@ -122,6 +122,10 @@ def test_invalid_input_preserves_existing_tau_and_output(tmp_path, monkeypatch, 
     elif failure == 'fit_failure':
         monkeypatch.setattr(temp_tune, 'minimize_scalar', lambda *a, **k:
                             SimpleNamespace(success=False, fun=0.0, x=0.0))
+    elif failure == 'sampling_failure':
+        def fail_after_fitting(*args, **kwargs):
+            raise ValueError('simulated sampling failure')
+        monkeypatch.setattr(temp_tune, 'sample_phys_gaussian', fail_after_fitting)
     val.to_csv(tmp_path / 'predictions_val.csv', index=False)
     app.to_csv(tmp_path / 'predictions_test.csv', index=False)
     tau_text = json.dumps({'A': 2.0, 'B': 3.0}) + '\n'

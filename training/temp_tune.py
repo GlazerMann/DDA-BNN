@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import json
+import os
 import re
+import tempfile
 import numpy as np
 import pandas as pd
 import yaml
@@ -334,7 +336,7 @@ def run_temp_tune(
             raise ValueError(f"{name} must be an integer >= {minimum}")
     val_csv = val_csv or (run_dir / "predictions_val.csv")
     apply_csv = apply_csv or (run_dir / "predictions_test.csv")
-    out_csv = out_csv or (apply_csv.parent / (apply_csv.stem + "_cal.csv"))
+    out_csv = Path(out_csv) if out_csv is not None else (apply_csv.parent / (apply_csv.stem + "_cal.csv"))
 
     # load config used
     with (run_dir / "config_used.yaml").open("r") as f:
@@ -363,12 +365,10 @@ def run_temp_tune(
     for t, tau in zip(targets, taus):
         print(f"  {t}: tau={tau:.6f}")
 
-    # save taus to run_dir for reuse by inference_api
+    # Delay publishing calibration factors until all sampling succeeds.
+    # A failed output generation must not leave new taus with old results.
     taus_dict = {t: float(tau) for t, tau in zip(targets, taus)}
     taus_path = run_dir / "taus.json"
-    with taus_path.open("w") as fh:
-        json.dump(taus_dict, fh, indent=2)
-    print(f"[INFO] saved taus → {taus_path}")
 
     # ---------- apply tau + sample ----------
     def run_with_taus(taus_used: np.ndarray):
@@ -416,13 +416,32 @@ def run_temp_tune(
     print("\n[CAL] Post-calibration (fitted tau):")
     coverage_report(df_post, targets)
 
-    # write only post-cal outputs
-    df_post.to_csv(out_csv, index=False)
-    print(f"[INFO] wrote → {out_csv}")
-
     if out_sme_csv:
         write_sme(df_post, Path(out_sme_csv))
 
+    # Stage both outputs on their destination filesystems before publishing
+    # either file. Each os.replace() is atomic for its own file; the pair is
+    # not a multi-file transaction if a later replacement fails.
+    staged_csv = staged_taus = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="",
+                                         prefix=f".{out_csv.name}.", suffix=".tmp",
+                                         dir=out_csv.parent, delete=False) as stream:
+            staged_csv = Path(stream.name)
+            df_post.to_csv(stream, index=False)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                         prefix=f".{taus_path.name}.", suffix=".tmp",
+                                         dir=taus_path.parent, delete=False) as stream:
+            staged_taus = Path(stream.name)
+            json.dump(taus_dict, stream, indent=2)
+        os.replace(staged_csv, out_csv)
+        os.replace(staged_taus, taus_path)
+    finally:
+        for staged in (staged_csv, staged_taus):
+            if staged is not None:
+                staged.unlink(missing_ok=True)
+    print(f"[INFO] wrote → {out_csv}")
+    print(f"[INFO] saved taus → {taus_path}")
     return taus_dict
 
 
