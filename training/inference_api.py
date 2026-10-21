@@ -90,7 +90,9 @@ def scale_like_training_np(X_raw: np.ndarray, x_scaler) -> np.ndarray:
     if np.isinf(X_raw).any():
         raise ValueError("Infinite feature values are invalid; use NaN for missing")
     mask = np.isnan(X_raw)
-    # Use training-time means rather than statistics of this inference batch.
+    # Supply finite, training-derived placeholders to the scaler; the values
+    # at missing coordinates are overwritten below. Final policy: a missing
+    # feature is zero in model-input space, not a batch-specific raw mean.
     filled = np.where(mask, x_scaler.mean_, X_raw)
     X_scaled = x_scaler.transform(filled)
     X_scaled[mask] = 0.0

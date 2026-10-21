@@ -23,7 +23,7 @@ class IdentityScalerTests(unittest.TestCase):
         for scale in (training_scale, release_scale):
             np.testing.assert_array_equal(scale(X, scaler), [[1., 0., 3.]])
 
-    def test_missing_values_use_training_means_before_scaling(self):
+    def test_missing_values_are_zero_in_model_input_space(self):
         from sklearn.preprocessing import StandardScaler
         scaler = StandardScaler().fit([[2., 8.], [4., 12.]])
         X = np.array([[np.nan, 12.], [4., 8.]])
@@ -31,3 +31,13 @@ class IdentityScalerTests(unittest.TestCase):
             got = scale(X, scaler)
             self.assertEqual(float(got[0, 0]), 0.0)
             self.assertEqual(float(got[1, 0]), 1.0)
+
+    def test_all_missing_column_is_batch_invariant(self):
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler().fit([[2., 8.], [4., 12.]])
+        alone = np.array([[np.nan, 12.]])
+        mixed = np.array([[np.nan, 12.], [100., -100.]])
+        for scale in (training_scale, release_scale):
+            np.testing.assert_allclose(scale(alone, scaler)[0],
+                                       scale(mixed, scaler)[0])
+            self.assertEqual(float(scale(alone, scaler)[0, 0]), 0.0)

@@ -231,6 +231,9 @@ def load_dataset(path: Path,
 
         # In no-scaling mode, missing features still need the same zero fill
         # as production inference; never pass NaNs through to the network.
+        # This zero is in raw units and may not be physically neutral for
+        # size/morphology features; changing the imputation policy requires
+        # a separate modeling decision and retraining.
         X_tr, X_va, X_te = (np.where(np.isnan(X_raw[idx]), 0.0, X_raw[idx])
                              for idx in (idx_tr, idx_va, idx_te))
         y_tr, y_va, y_te = y_raw_np[idx_tr], y_raw_np[idx_va], y_raw_np[idx_te]
