@@ -258,10 +258,22 @@ def run_inference_latent(
     pyro.set_rng_seed(seed)
     pyro.clear_param_store()
     pyro_path = run_dir / "pyro_params.pt"
-    has_pyro = pyro_path.exists() and getattr(model, "has_bayes", False)
+    has_pyro = getattr(model, "has_bayes", False)
     if has_pyro:
-        pyro.get_param_store().load(str(pyro_path), map_location=device)
+        if not pyro_path.is_file():
+            raise FileNotFoundError(f"Bayesian inference requires posterior parameters: {pyro_path}")
+        store = pyro.get_param_store()
+        store.load(str(pyro_path), map_location=device)
+        saved_names = set(store.keys())
         model.guide(xb[:1])
+        # AutoDiagonalNormal may initialize missing parameters during its
+        # first call. Such newly initialized values are not a saved posterior.
+        for name, parameter in model.guide.named_parameters():
+            stored_name = store.param_name(parameter)
+            if stored_name not in saved_names:
+                raise ValueError(f"Saved posterior is missing guide parameter {name!r}")
+            if parameter.shape != (model.guide.latent_dim,) or not bool(torch.isfinite(parameter).all()):
+                raise ValueError(f"Saved posterior has invalid guide parameter {name!r}")
 
     if has_pyro:
         pred = pyro.infer.Predictive(model, guide=model.guide, num_samples=num_mc, return_sites=["_RETURN"])(xb)
@@ -316,17 +328,40 @@ def run_inference_latent(
 
 
 # ---------------- physical inference (Option B: use posterior samples) ----------------
-def stats_from_nested_cloud(y_kl: np.ndarray, quantiles=(0.05, 0.5, 0.95)):
+def stats_from_nested_cloud(y_kl: np.ndarray, quantiles=(0.05, 0.5, 0.95),
+                            *, epistemic_zero=None, aleatoric_zero=None):
+    """Estimate physical-space variance components from independent inner draws.
+
+    Remove finite-L Monte Carlo variance from the outer group means.
+    epistemic_zero/aleatoric_zero are known-absence masks broadcastable to
+    (N,D); they describe model components, not small estimated variances.
+    Corrected components are nonnegative and sum to total variance. Clipping
+    a noisy negative epistemic estimate at zero retains finite-sample bias.
+    Means and quantiles continue to use the original pooled sample cloud.
+    """
+    y_kl = np.asarray(y_kl, dtype=np.float64)
+    if y_kl.ndim != 4 or 0 in y_kl.shape or not np.isfinite(y_kl).all():
+        raise ValueError("Expected a nonempty finite (K,L,N,D) sample cloud")
     K, L, N, D = y_kl.shape
+    epi_zero = np.broadcast_to(False if epistemic_zero is None else epistemic_zero, (N, D))
+    ale_zero = np.broadcast_to(False if aleatoric_zero is None else aleatoric_zero, (N, D))
+    if L < 2 and not np.all(ale_zero):
+        raise ValueError("L must be at least 2 to estimate aleatoric variance")
     y_pool = y_kl.reshape(K * L, N, D)
-    mean = np.mean(y_pool, axis=0)
-    var_tot = np.var(y_pool, axis=0, ddof=0)
-    std_tot = np.sqrt(np.maximum(var_tot, 1e-24))
-    var_ale = np.mean(np.var(y_kl, axis=1, ddof=0), axis=0)  # E_k[Var_l]
-    var_epi = np.var(np.mean(y_kl, axis=1), axis=0, ddof=0)  # Var_k[E_l]
-    std_ale = np.sqrt(np.maximum(var_ale, 1e-24))
-    std_epi = np.sqrt(np.maximum(var_epi, 1e-24))
-    q_out = {f"q{int(round(q*100)):02d}": np.quantile(y_pool, q, axis=0) for q in quantiles}
+    mean = y_pool.mean(axis=0)
+    var_ale = (y_kl.var(axis=1, ddof=1).mean(axis=0)
+               if L > 1 else np.zeros((N, D)))
+    var_ale = np.where(ale_zero, 0.0, var_ale)
+    var_means = y_kl.mean(axis=1).var(axis=0, ddof=0)
+    # For a finite K-point ensemble, independent mean-estimation errors
+    # contribute (1 - 1/K) * E[Var(Y|w)] / L to this population variance.
+    var_epi = np.maximum(var_means - (1.0 - 1.0 / K) * var_ale / L, 0.0)
+    var_epi = np.where(epi_zero, 0.0, var_epi)
+    std_ale = np.sqrt(var_ale)
+    std_epi = np.sqrt(var_epi)
+    std_tot = np.sqrt(var_ale + var_epi)
+    q_out = {f"q{int(round(q * 100)):02d}": np.quantile(y_pool, q, axis=0)
+             for q in quantiles}
     return mean, std_ale, std_epi, std_tot, q_out
 
 
@@ -401,7 +436,14 @@ def run_inference_phys(
     # inverse transform to physical
     y = inverse_phys_tf(t.reshape(S_eff * L * N, D), tf_info, tf_eps).reshape(S_eff, L, N, D)
 
-    return stats_from_nested_cloud(y, quantiles=quantiles)
+    # Equal conditional distributions imply no epistemic variation in the
+    # sampled ensemble, including after nonlinear physical transforms.
+    epistemic_zero = (np.all(mu_lat_s_cal == mu_lat_s_cal[:1], axis=0) &
+                       np.all(std_ale_lat_s_cal == std_ale_lat_s_cal[:1], axis=0))
+    aleatoric_zero = np.all(std_ale_lat_s_cal == 0, axis=0)
+    return stats_from_nested_cloud(y, quantiles=quantiles,
+                                   epistemic_zero=epistemic_zero,
+                                   aleatoric_zero=aleatoric_zero)
 
 
 # ------------------------------------------------------------------ #
