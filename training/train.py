@@ -87,6 +87,11 @@ def early_stop_start_epoch() -> int:
 # SVI helper (KL warm-up + per-parameter LR)
 # ----------------------------------------------------------------------
 def make_svi(model, epoch, warmup=cfg.WARMUP, optimizer=None):
+    """Build an epoch wrapper without introducing dataset-size scaling.
+
+    Production likelihood/prior weighting and its acceptance decision are
+    described in docs/minibatch-objective.md. Optimizer reuse preserves it.
+    """
     beta = min(1.0, epoch / max(1, warmup))
 
     EPS = 1.0e-8  # already defined above
