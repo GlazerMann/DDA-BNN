@@ -16,6 +16,16 @@ class NestedComponentTests(unittest.TestCase):
         np.testing.assert_array_equal(mean, cloud.mean(axis=(0, 1)))
         np.testing.assert_array_equal(quantiles['q50'], np.quantile(cloud.reshape(-1, 1, 1), .5, axis=0))
 
+    def test_corrected_total_is_not_the_pooled_cloud_standard_deviation(self):
+        cloud = np.array([0.0, 2.0, 4.0, 6.0]).reshape(2, 2, 1, 1)
+        mean, ale, epi, total, quantiles = api.stats_from_nested_cloud(cloud)
+        np.testing.assert_allclose(mean, [[3.0]])
+        np.testing.assert_allclose(ale**2, [[2.0]])
+        np.testing.assert_allclose(epi**2, [[3.5]])
+        np.testing.assert_allclose(total**2, [[5.5]])
+        self.assertNotAlmostEqual(float(total[0, 0]), float(cloud.std()))
+        np.testing.assert_array_equal(quantiles['q50'], [[3.0]])
+
     def test_known_absent_component_stays_exactly_zero(self):
         rng = np.random.default_rng(3)
         cloud = rng.normal(size=(100, 20, 2, 2))
